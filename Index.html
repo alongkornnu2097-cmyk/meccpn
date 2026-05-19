@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ลงทะเบียนอบรมโครงการพัฒนาบุคลากรสายสนับสนุน MES รุ่นที่ 9</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Kanit', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#10b981',
+                        darkBg: '#0f172a',
+                        cardBg: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: 'Kanit', sans-serif; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        .form-input {
+            width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.375rem;
+            background-color: #334155; border: 1px solid #475569; color: white;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        .form-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25); }
+        .form-label { display: block; margin-bottom: 0.25rem; font-size: 0.875rem; font-weight: 500; color: #cbd5e1; }
+        
+        /* Print Styles */
+        @media print {
+            body { background-color: white !important; color: black !important; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            #preview-modal-content { color: black; background: white; padding: 20px; }
+        }
+        .print-only { display: none; }
+        
+        /* Loader */
+        .loader { border: 4px solid #334155; border-top: 4px solid #3b82f6; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col relative">
+
+    <script>
+        // 🚨 นำ URL ของเว็บแอป (Google Apps Script) ที่ก๊อปปี้มา วางแทนที่ในเครื่องหมายคำพูดด้านล่าง
+        const SCRIPT_URL = 'YOUR_GOOGLE_WEB_APP_URL_HERE'; 
+
+        // สร้าง ID สุ่มให้แต่ละรายการ
+        const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+        // ฟังก์ชันบันทึกข้อมูล
+        window.saveRegistration = async (data) => {
+            if (SCRIPT_URL === 'YOUR_GOOGLE_WEB_APP_URL_HERE') {
+                window.showToast("กรุณาตั้งค่า SCRIPT_URL ในโค้ดก่อนใช้งาน", "error");
+                return false;
+            }
+            try {
+                data.id = generateId(); 
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                return result.success;
+            } catch (error) {
+                console.error("Error saving data: ", error);
+                return false;
+            }
+        };
+
+        // ฟังก์ชันอัปเดตสถานะ (ดึงจาก Sheets)
+        window.updateRegistrationStatus = async (id, newStatus) => {
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'updateStatus', id: id, status: newStatus })
+                });
+                const result = await response.json();
+                return result.success;
+            } catch (error) {
+                console.error("Error updating status: ", error);
+                return false;
+            }
+        };
+
+        // ฟังก์ชันดึงข้อมูลมาแสดงในตาราง Admin
+        window.fetchRegistrations = (callback) => {
+             const fetchData = async () => {
+                 try {
+                     const response = await fetch(SCRIPT_URL);
+                     const data = await response.json();
+                     callback(data);
+                 } catch (error) {
+                     console.error("Error fetching data: ", error);
+                     callback([]);
+                 }
+             };
+             
+             fetchData();
+             // ดึงข้อมูลใหม่ทุกๆ 15 วินาทีขณะเปิดหน้า Dashboard ทิ้งไว้
+             const intervalId = setInterval(fetchData, 15000);
+             return () => clearInterval(intervalId); // ฟังก์ชันสำหรับหยุดดึงข้อมูลเมื่อออกจากหน้าแอดมิน
+        }
+    </script>
+
+    <header class="bg-cardBg shadow-lg border-b border-gray-700 py-6 px-4 sm:px-6 lg:px-8 no-print">
+        <div class="max-w-5xl mx-auto text-center">
+            <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 leading-tight">
+                ลงทะเบียนอบรมโครงการพัฒนาบุคลากรสายสนับสนุน MES รุ่นที่ 9<br>
+                <span class="text-xl sm:text-2xl text-blue-400">ประจำปีงบประมาณ 2569</span>
+            </h1>
+            <p class="text-sm sm:text-base text-gray-400 mt-2 max-w-3xl mx-auto">
+                ศูนย์แพทยศาสตรศึกษาชั้นคลินิก โรงพยาบาลชุมพรเขตรอุดมศักดิ์ และสำนักส่งเสริม สนับสนุนการผลิต พัฒนาแพทย์และบุคลากรทางการแพทย์
+            </p>
+        </div>
+        <div class="max-w-5xl mx-auto mt-6 flex justify-end">
+            <button onclick="toggleAdminLogin()" class="text-xs text-gray-500 hover:text-white transition">สำหรับเจ้าหน้าที่ (Admin)</button>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8 no-print" id="main-container">
+        
+        <!-- FORM VIEW -->
+        <div id="form-view" class="bg-cardBg rounded-xl shadow-2xl p-6 sm:p-8 border border-gray-700">
+            <h2 class="text-xl font-semibold text-white mb-6 border-b border-gray-700 pb-2">ข้อมูลผู้ลงทะเบียน</h2>
+            
+            <form id="registration-form" onsubmit="handleFormSubmit(event)">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="md:col-span-2">
+                        <label class="form-label">หน่วยงานศูนย์แพทยศาสตรศึกษาชั้นคลินิก / โรงพยาบาล <span class="text-red-500">*</span></label>
+                        <select id="hospital" required class="form-input">
+                            <option value="">-- กรุณาเลือกหน่วยงาน --</option>
+                            <!-- Generated by JS -->
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label">คำนำหน้า <span class="text-red-500">*</span></label>
+                        <select id="prefix" required class="form-input">
+                            <option value="">-- เลือก --</option>
+                            <option value="นาย">นาย</option>
+                            <option value="นางสาว">นางสาว</option>
+                            <option value="นาง">นาง</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label">ชื่อ - สกุล <span class="text-red-500">*</span></label>
+                        <input type="text" id="fullname" required class="form-input" placeholder="ไม่ต้องระบุคำนำหน้า">
+                    </div>
+
+                    <div>
+                        <label class="form-label">ตำแหน่ง <span class="text-red-500">*</span></label>
+                        <input type="text" id="position" required class="form-input">
+                    </div>
+
+                    <div>
+                        <label class="form-label">เบอร์โทรศัพท์ (10 หลัก) <span class="text-red-500">*</span></label>
+                        <input type="tel" id="phone" pattern="[0-9]{10}" required class="form-input" placeholder="08XXXXXXXX">
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="form-label">อีเมล (@cpird.in.th) <span class="text-red-500">*</span></label>
+                        <input type="email" id="email" required class="form-input" placeholder="example@cpird.in.th">
+                    </div>
+                </div>
+
+                <h2 class="text-xl font-semibold text-white mb-6 border-b border-gray-700 pb-2">ข้อมูลที่พัก</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 bg-gray-800 p-4 rounded-lg">
+                    <div>
+                        <label class="form-label">ห้องพัก <span class="text-red-500">*</span></label>
+                        <div class="flex space-x-4 mt-2">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="roomType" value="เดี่ยว" required class="form-radio text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600">
+                                <span>เดี่ยว</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="roomType" value="คู่" required class="form-radio text-blue-500 focus:ring-blue-500 bg-gray-700 border-gray-600">
+                                <span>คู่</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label">เข้าพักวันที่ <span class="text-red-500">*</span></label>
+                        <input type="date" id="checkInDate" required class="form-input text-sm">
+                    </div>
+                    <div>
+                        <label class="form-label">ออกวันที่ <span class="text-red-500">*</span></label>
+                        <input type="date" id="checkOutDate" required class="form-input text-sm">
+                    </div>
+                </div>
+
+                <h2 class="text-xl font-semibold text-white mb-6 border-b border-gray-700 pb-2">การเดินทาง</h2>
+                <div class="mb-4">
+                    <label class="form-label mb-3">รูปแบบการเดินทาง <span class="text-red-500">*</span></label>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <label class="flex items-center space-x-2 cursor-pointer bg-gray-800 p-2 rounded border border-gray-700 hover:border-blue-500">
+                            <input type="radio" name="travelMode" value="รถยนต์ส่วนตัว" required onchange="toggleTravelFields()" class="form-radio text-blue-500">
+                            <span class="text-sm">รถยนต์ส่วนตัว</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer bg-gray-800 p-2 rounded border border-gray-700 hover:border-blue-500">
+                            <input type="radio" name="travelMode" value="รถยนต์ราชการ" required onchange="toggleTravelFields()" class="form-radio text-blue-500">
+                            <span class="text-sm">รถยนต์ราชการ</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer bg-gray-800 p-2 rounded border border-gray-700 hover:border-blue-500">
+                            <input type="radio" name="travelMode" value="เครื่องบิน" required onchange="toggleTravelFields()" class="form-radio text-blue-500">
+                            <span class="text-sm">เครื่องบิน</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer bg-gray-800 p-2 rounded border border-gray-700 hover:border-blue-500">
+                            <input type="radio" name="travelMode" value="รถโดยสารประจำทาง" required onchange="toggleTravelFields()" class="form-radio text-blue-500">
+                            <span class="text-sm">รถโดยสารประจำทาง</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer bg-gray-800 p-2 rounded border border-gray-700 hover:border-blue-500">
+                            <input type="radio" name="travelMode" value="รถไฟ" required onchange="toggleTravelFields()" class="form-radio text-blue-500">
+                            <span class="text-sm">รถไฟ</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer bg-gray-800 p-2 rounded border border-gray-700 hover:border-blue-500">
+                            <input type="radio" name="travelMode" value="อื่นๆ" required onchange="toggleTravelFields()" class="form-radio text-blue-500">
+                            <span class="text-sm">อื่นๆ</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Dynamic Travel Fields Container -->
+                <div id="travel-details-container" class="bg-gray-800 p-4 rounded-lg mb-8 hidden border border-gray-700">
+                    <!-- Injected by JS -->
+                </div>
+
+                <h2 class="text-xl font-semibold text-white mb-6 border-b border-gray-700 pb-2">ข้อมูลอาหารและบริการรถรับ-ส่ง</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <!-- Food -->
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                        <label class="form-label mb-3">ข้อมูลอาหาร <span class="text-red-500">*</span></label>
+                        <div class="space-y-2">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="foodType" value="อาหารทั่วไป" required onchange="toggleFoodOther()" class="form-radio text-blue-500">
+                                <span>อาหารทั่วไป</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="foodType" value="อาหารอิสลาม" required onchange="toggleFoodOther()" class="form-radio text-blue-500">
+                                <span>อาหารอิสลาม</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="foodType" value="อาหารมังสวิรัติ" required onchange="toggleFoodOther()" class="form-radio text-blue-500">
+                                <span>อาหารมังสวิรัติ</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="foodType" value="อื่นๆ" required onchange="toggleFoodOther()" class="form-radio text-blue-500">
+                                <span>อื่นๆ</span>
+                            </label>
+                            <input type="text" id="foodOtherText" class="form-input mt-2 hidden" placeholder="โปรดระบุอาหาร">
+                        </div>
+                        <div class="mt-4">
+                            <label class="form-label">แพ้อาหาร (โปรดระบุ หากไม่มีให้ข้าม)</label>
+                            <input type="text" id="foodAllergy" class="form-input" placeholder="เช่น กุ้ง, ถั่วลิสง">
+                        </div>
+                    </div>
+
+                    <!-- Shuttle -->
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                        <label class="form-label mb-3">บริการรถ รับ - ส่ง <span class="text-red-500">*</span></label>
+                        <div class="flex space-x-4 mb-4">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="shuttleService" value="ต้องการ" required onchange="toggleShuttleFields()" class="form-radio text-blue-500">
+                                <span>ต้องการ</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="shuttleService" value="ไม่ต้องการ" required onchange="toggleShuttleFields()" class="form-radio text-blue-500">
+                                <span>ไม่ต้องการ</span>
+                            </label>
+                        </div>
+                        
+                        <div id="shuttle-details" class="hidden space-y-4 border-t border-gray-600 pt-4">
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="form-label text-xs">วันที่รับ</label>
+                                    <input type="date" id="shuttlePickDate" class="form-input text-xs">
+                                </div>
+                                <div>
+                                    <label class="form-label text-xs">เวลารับ</label>
+                                    <input type="time" id="shuttlePickTime" class="form-input text-xs">
+                                </div>
+                                <div>
+                                    <label class="form-label text-xs">วันที่ส่ง</label>
+                                    <input type="date" id="shuttleDropDate" class="form-input text-xs">
+                                </div>
+                                <div>
+                                    <label class="form-label text-xs">เวลาส่ง</label>
+                                    <input type="time" id="shuttleDropTime" class="form-input text-xs">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="form-label text-xs mb-2">สถานที่ที่ต้องการให้ รับ - ส่ง</label>
+                                <div class="space-y-1 text-sm">
+                                    <label class="flex items-center space-x-2"><input type="radio" name="shuttleLocation" value="สนามบิน" class="form-radio" onchange="toggleShuttleOther()"><span>สนามบิน</span></label>
+                                    <label class="flex items-center space-x-2"><input type="radio" name="shuttleLocation" value="สถานีขนส่งผู้โดยสาร" class="form-radio" onchange="toggleShuttleOther()"><span>สถานีขนส่งผู้โดยสาร</span></label>
+                                    <label class="flex items-center space-x-2"><input type="radio" name="shuttleLocation" value="สถานีเดินรถนครชัยแอร์" class="form-radio" onchange="toggleShuttleOther()"><span>สถานีเดินรถนครชัยแอร์</span></label>
+                                    <label class="flex items-center space-x-2"><input type="radio" name="shuttleLocation" value="สถานีรถไฟ" class="form-radio" onchange="toggleShuttleOther()"><span>สถานีรถไฟ</span></label>
+                                    <label class="flex items-center space-x-2"><input type="radio" name="shuttleLocation" value="อื่นๆ" class="form-radio" onchange="toggleShuttleOther()"><span>อื่นๆ</span></label>
+                                </div>
+                                <input type="text" id="shuttleOtherLoc" class="form-input mt-2 hidden text-sm" placeholder="ระบุสถานที่">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <label class="form-label">หมายเหตุ (ถ้ามี)</label>
+                    <textarea id="note" rows="3" class="form-input"></textarea>
+                </div>
+
+                <div class="flex justify-center mt-8">
+                    <button type="submit" id="submitBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-12 rounded-full shadow-lg transform transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 text-lg flex items-center justify-center min-w-[250px]">
+                        <span>ยืนยันการลงทะเบียน</span>
+                        <div id="submitLoader" class="loader ml-3 hidden border-white border-t-transparent"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div id="admin-view" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-white">ระบบจัดการและรายงานผล (Dashboard)</h2>
+                <button onclick="logoutAdmin()" class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded shadow transition flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg> ออกจากระบบ Admin</button>
+            </div>
+
+            <!-- Project Info -->
+            <div class="bg-gray-800 p-5 rounded-lg shadow-lg border border-gray-700 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center">
+                <div>
+                    <h3 class="text-lg font-bold text-white mb-1">รายการโครงการ: โครงการพัฒนาบุคลากรสายสนับสนุน MES รุ่นที่ 9</h3>
+                    <p class="text-gray-400 text-sm">ประจำปีงบประมาณ 2569 | ศูนย์แพทยศาสตรศึกษาชั้นคลินิก โรงพยาบาลชุมพรเขตรอุดมศักดิ์</p>
+                </div>
+                <div class="mt-4 md:mt-0 flex items-center space-x-3">
+                    <span class="px-3 py-1 bg-green-900 border border-green-500 text-green-300 rounded-full text-sm font-medium animate-pulse">สถานะโครงการ: เปิดรับลงทะเบียน</span>
+                </div>
+            </div>
+
+            <!-- Dashboard Stats -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-cardBg p-4 rounded-lg shadow-lg border border-gray-700 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-3 opacity-20"><svg class="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></div>
+                    <h3 class="text-gray-400 text-sm font-medium relative z-10">ยอดลงทะเบียนทั้งหมด</h3>
+                    <p class="text-3xl font-bold text-white mt-1 relative z-10" id="stat-total">0</p>
+                </div>
+                <div class="bg-cardBg p-4 rounded-lg shadow-lg border border-gray-700 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-3 opacity-20"><svg class="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                    <h3 class="text-gray-400 text-sm font-medium relative z-10">ยืนยันเข้าร่วมแล้ว</h3>
+                    <p class="text-3xl font-bold text-green-400 mt-1 relative z-10" id="stat-approved">0</p>
+                </div>
+                <div class="bg-cardBg p-4 rounded-lg shadow-lg border border-gray-700 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-3 opacity-20"><svg class="w-12 h-12 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg></div>
+                    <h3 class="text-gray-400 text-sm font-medium relative z-10">ต้องการรถรับ-ส่ง</h3>
+                    <p class="text-3xl font-bold text-yellow-400 mt-1 relative z-10" id="stat-shuttle">0</p>
+                </div>
+                <div class="bg-cardBg p-4 rounded-lg shadow-lg border border-gray-700 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-3 opacity-20"><svg class="w-12 h-12 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg></div>
+                    <h3 class="text-gray-400 text-sm font-medium relative z-10">ต้องการห้องพักเดี่ยว</h3>
+                    <p class="text-3xl font-bold text-purple-400 mt-1 relative z-10" id="stat-room">0</p>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-cardBg p-4 rounded-lg shadow-lg border border-gray-700">
+                    <h3 class="text-white mb-4 text-center font-medium">สัดส่วนการเดินทาง</h3>
+                    <div class="relative h-56 w-full flex justify-center">
+                        <canvas id="travelChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-cardBg p-4 rounded-lg shadow-lg border border-gray-700">
+                    <h3 class="text-white mb-4 text-center font-medium">ข้อมูลอาหาร</h3>
+                    <div class="relative h-56 w-full flex justify-center">
+                        <canvas id="foodChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-cardBg p-4 rounded-lg shadow-lg border border-gray-700">
+                    <h3 class="text-white mb-4 text-center font-medium">สัดส่วนโรงพยาบาล (Top 5)</h3>
+                    <div class="relative h-56 w-full flex justify-center">
+                        <canvas id="hospitalChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="bg-cardBg p-4 rounded-lg shadow border border-gray-700">
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                    <h3 class="text-lg font-bold text-white">รายชื่อผู้ลงทะเบียน</h3>
+                    <div class="flex space-x-2">
+                        <button onclick="exportExcel()" class="bg-green-600 hover:bg-green-700 text-white py-1 px-3 rounded text-sm flex items-center transition"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> Excel</button>
+                        <button onclick="window.print()" class="bg-gray-600 hover:bg-gray-700 text-white py-1 px-3 rounded text-sm flex items-center transition"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg> Print All</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-sm text-gray-300">
+                        <thead class="bg-gray-800 text-gray-100 uppercase text-xs border-b border-gray-700">
+                            <tr>
+                                <th class="px-4 py-3">ลำดับ</th>
+                                <th class="px-4 py-3">ชื่อ-สกุล</th>
+                                <th class="px-4 py-3">หน่วยงาน</th>
+                                <th class="px-4 py-3">เบอร์โทร</th>
+                                <th class="px-4 py-3 text-center">สถานะ</th>
+                                <th class="px-4 py-3 text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body" class="divide-y divide-gray-700">
+                            <!-- Populated by JS -->
+                            <tr><td colspan="6" class="text-center py-4 text-gray-500">กำลังโหลดข้อมูล...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-900 border-t border-gray-800 py-6 text-center mt-auto no-print">
+        <p class="text-gray-500 text-sm">
+            © 2026 Copyright ศูนย์แพทยศาสตรศึกษาชั้นคลินิก โรงพยาบาลชุมพรเขตรอุดมศักดิ์ | ออกแบบโดย pondpond
+        </p>
+    </footer>
+
+    <!-- Custom Toast -->
+    <div id="toast" class="fixed top-5 right-5 transform translate-x-full transition-transform duration-300 z-50 rounded-lg shadow-lg px-6 py-4 flex items-center text-white no-print">
+        <span id="toast-message">Message</span>
+    </div>
+
+    <!-- Admin Login Modal -->
+    <div id="admin-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden no-print backdrop-blur-sm">
+        <div class="bg-cardBg rounded-xl p-8 max-w-sm w-full mx-4 border border-gray-700 shadow-2xl">
+            <h3 class="text-xl font-bold text-white mb-4 text-center">เข้าสู่ระบบ Admin</h3>
+            <input type="password" id="admin-pwd" class="form-input mb-4 text-center" placeholder="รหัสผ่าน">
+            <div class="flex space-x-3">
+                <button onclick="closeAdminModal()" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded transition">ยกเลิก</button>
+                <button onclick="verifyAdmin()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition">เข้าสู่ระบบ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview/Print Modal (Word-like) -->
+    <div id="preview-modal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-50 hidden no-print overflow-y-auto">
+        <div class="w-full max-w-4xl min-h-screen sm:min-h-0 sm:my-8 bg-white rounded-none sm:rounded-lg shadow-2xl flex flex-col relative text-black">
+            <!-- Controls -->
+            <div class="bg-gray-100 p-4 border-b flex justify-between items-center sticky top-0 z-10 no-print rounded-t-lg">
+                <h3 class="font-bold text-gray-800">Preview (แบบฟอร์มลงทะเบียน)</h3>
+                <div class="flex space-x-2">
+                    <button onclick="exportPDF()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm transition shadow">Export PDF</button>
+                    <button onclick="printPreview()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm transition shadow">Print</button>
+                    <button onclick="closePreview()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm transition shadow">ปิด</button>
+                </div>
+            </div>
+            
+            <!-- Document Content (A4 style) -->
+            <div id="preview-modal-content" class="p-8 sm:p-12 text-sm leading-relaxed max-w-3xl mx-auto w-full bg-white print-only" style="font-family: 'Kanit', sans-serif;">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Constants & Data
+        const hospitals = [
+            "กาฬสินธุ์", "ขอนแก่น", "เจ้าพระยาอภัยภูเบศร", "ชลบุรี", "ชัยภูมิ", "ชุมพรเขตรอุดมศักดิ์", 
+            "เชียงรายประชานุเคราะห์", "ตรัง", "นครพิงค์", "นราธิวาสราชนครินทร์", "บุรีรัมย์", "ปัตตานี", 
+            "พระปกเกล้า จันทบุรี", "พะเยา", "พิจิตร", "พุทธชินราช พิษณุโลก", "พุทธโสธร", "แพร่", 
+            "มหาราชนครราชสีมา", "มหาราชนครศรีธรรมราช", "มหาสารคาม", "ยะลา", "ร้อยเอ็ด", "ราชบุรี", 
+            "ลำปาง", "วชิระภูเก็ต", "ศรีสะเกษ", "สงขลา", "สมเด็จพระเจ้าตากสินมหาราช", "สรรพสิทธิประสงค์", 
+            "สระบุรี", "สวรรค์ประชารักษ์", "สุราษฎร์ธานี", "สุรินทร์", "อุดรธานี", "อุตรดิตถ์", "สกลนคร", 
+            "พระนครศรีอยุธยา", "เจ้าพระยายมราช", "พระนั่งเกล้านนทบุรี", 
+            "สำนักส่งเสริม สนับสนุนการผลิต พัฒนาแพทย์และบุคลากรทางการแพทย์"
+        ];
+
+        const flightsNokOut = ["Nokair(DD310)", "Nokair(DD350)", "Nokair(DD380)"];
+        const flightsAirReturn = ["AirAsia(FD3310)", "AirAsia(FD3510)", "AirAsia(FD3810)"];
+
+        let adminUnsubscribe = null;
+        let registrationsData = [];
+        let chartsInstance = {};
+
+        // Utility: Date to Buddhist Era (พ.ศ.)
+        function toThaiDate(dateStr) {
+            if(!dateStr) return "-";
+            const d = new Date(dateStr);
+            if(isNaN(d)) return dateStr;
+            const day = d.getDate().toString().padStart(2, '0');
+            const month = (d.getMonth() + 1).toString().padStart(2, '0');
+            const yearBE = d.getFullYear() + 543;
+            return `${day}/${month}/${yearBE}`;
+        }
+
+        // Initialize Form UI
+        document.addEventListener('DOMContentLoaded', () => {
+            const hospSelect = document.getElementById('hospital');
+            hospitals.forEach(h => {
+                const opt = document.createElement('option');
+                opt.value = h;
+                opt.textContent = h;
+                hospSelect.appendChild(opt);
+            });
+        });
+
+        // Toast Notification System
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toast-message');
+            msg.textContent = message;
+            
+            if (type === 'success') {
+                toast.className = 'fixed top-5 right-5 transform transition-transform duration-300 z-50 rounded-lg shadow-lg px-6 py-4 flex items-center text-white bg-green-600 no-print';
+            } else {
+                toast.className = 'fixed top-5 right-5 transform transition-transform duration-300 z-50 rounded-lg shadow-lg px-6 py-4 flex items-center text-white bg-red-600 no-print';
+            }
+            
+            toast.classList.remove('translate-x-full');
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+            }, 4000);
+        }
+
+        function toggleTravelFields() {
+            const mode = document.querySelector('input[name="travelMode"]:checked')?.value;
+            const container = document.getElementById('travel-details-container');
+            container.innerHTML = ''; 
+            
+            if (!mode) {
+                container.classList.add('hidden');
+                return;
+            }
+            container.classList.remove('hidden');
+
+            let html = '';
+            if (mode === 'รถยนต์ส่วนตัว' || mode === 'รถยนต์ราชการ') {
+                html = `
+                    <h4 class="text-sm font-semibold text-blue-400 mb-2">รายละเอียด (${mode})</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label class="form-label text-xs">ขาไป: วันที่เดินทาง</label>
+                            <input type="date" id="carGoDate" required class="form-input text-sm">
+                            <label class="form-label text-xs">เวลา</label>
+                            <input type="time" id="carGoTime" required class="form-input text-sm">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="form-label text-xs">ขากลับ: วันที่เดินทาง</label>
+                            <input type="date" id="carReturnDate" required class="form-input text-sm">
+                            <label class="form-label text-xs">เวลา</label>
+                            <input type="time" id="carReturnTime" required class="form-input text-sm">
+                        </div>
+                    </div>`;
+            } else if (mode === 'เครื่องบิน') {
+                let outOpts = flightsNokOut.map(f => `<option value="${f}">${f}</option>`).join('');
+                let retOpts = flightsAirReturn.map(f => `<option value="${f}">${f}</option>`).join('');
+                html = `
+                    <h4 class="text-sm font-semibold text-blue-400 mb-2">รายละเอียด (เครื่องบิน)</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-2 border border-gray-600 p-3 rounded bg-gray-700/50">
+                            <p class="text-xs text-gray-300 font-bold">ขามา (ถึงสนามบิน)</p>
+                            <label class="form-label text-xs">วันที่</label>
+                            <input type="date" id="airGoDate" required class="form-input text-sm">
+                            <label class="form-label text-xs">สายการบิน/เที่ยวบิน</label>
+                            <select id="airGoFlight" required class="form-input text-sm"><option value="">-เลือก-</option>${outOpts}</select>
+                            <label class="form-label text-xs">เวลาเครื่องลง</label>
+                            <input type="time" id="airGoTime" required class="form-input text-sm">
+                        </div>
+                        <div class="space-y-2 border border-gray-600 p-3 rounded bg-gray-700/50">
+                            <p class="text-xs text-gray-300 font-bold">ขากลับ (ขึ้นเครื่อง)</p>
+                            <label class="form-label text-xs">วันที่</label>
+                            <input type="date" id="airRetDate" required class="form-input text-sm">
+                            <label class="form-label text-xs">สายการบิน/เที่ยวบิน</label>
+                            <select id="airRetFlight" required class="form-input text-sm"><option value="">-เลือก-</option>${retOpts}</select>
+                            <label class="form-label text-xs">เวลาเครื่องขึ้น</label>
+                            <input type="time" id="airRetTime" required class="form-input text-sm">
+                        </div>
+                    </div>`;
+            } else if (mode === 'รถโดยสารประจำทาง') {
+                html = `
+                    <h4 class="text-sm font-semibold text-blue-400 mb-2">รายละเอียด (รถโดยสารประจำทาง)</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-2 border border-gray-600 p-3 rounded bg-gray-700/50">
+                            <p class="text-xs text-gray-300 font-bold">ขามา (ถึงสถานีขนส่ง)</p>
+                            <label class="form-label text-xs">วันที่</label>
+                            <input type="date" id="busGoDate" required class="form-input text-sm">
+                            <label class="form-label text-xs">บริษัทรถ/เที่ยวรถ</label>
+                            <input type="text" id="busGoDetail" required class="form-input text-sm">
+                            <label class="form-label text-xs">เวลาถึงสถานี</label>
+                            <input type="time" id="busGoTime" required class="form-input text-sm">
+                        </div>
+                        <div class="space-y-2 border border-gray-600 p-3 rounded bg-gray-700/50">
+                            <p class="text-xs text-gray-300 font-bold">ขากลับ (รถออก)</p>
+                            <label class="form-label text-xs">วันที่</label>
+                            <input type="date" id="busRetDate" required class="form-input text-sm">
+                            <label class="form-label text-xs">บริษัทรถ/เที่ยวรถ</label>
+                            <input type="text" id="busRetDetail" required class="form-input text-sm">
+                            <label class="form-label text-xs">เวลารถออก</label>
+                            <input type="time" id="busRetTime" required class="form-input text-sm">
+                        </div>
+                    </div>`;
+            } else if (mode === 'รถไฟ') {
+                html = `
+                    <h4 class="text-sm font-semibold text-blue-400 mb-2">รายละเอียด (รถไฟ)</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-2 border border-gray-600 p-3 rounded bg-gray-700/50">
+                            <p class="text-xs text-gray-300 font-bold">ขามา (ถึงสถานีรถไฟ)</p>
+                            <label class="form-label text-xs">วันที่</label>
+                            <input type="date" id="trainGoDate" required class="form-input text-sm">
+                            <label class="form-label text-xs">เที่ยวรถไฟ</label>
+                            <input type="text" id="trainGoDetail" required class="form-input text-sm">
+                            <label class="form-label text-xs">เวลาถึงสถานี</label>
+                            <input type="time" id="trainGoTime" required class="form-input text-sm">
+                        </div>
+                        <div class="space-y-2 border border-gray-600 p-3 rounded bg-gray-700/50">
+                            <p class="text-xs text-gray-300 font-bold">ขากลับ (รถออก)</p>
+                            <label class="form-label text-xs">วันที่</label>
+                            <input type="date" id="trainRetDate" required class="form-input text-sm">
+                            <label class="form-label text-xs">เที่ยวรถไฟ</label>
+                            <input type="text" id="trainRetDetail" required class="form-input text-sm">
+                            <label class="form-label text-xs">เวลารถออก</label>
+                            <input type="time" id="trainRetTime" required class="form-input text-sm">
+                        </div>
+                    </div>`;
+            } else if (mode === 'อื่นๆ') {
+                html = `
+                    <h4 class="text-sm font-semibold text-blue-400 mb-2">รายละเอียด (อื่นๆ)</h4>
+                    <textarea id="otherTravelDetail" required rows="2" class="form-input" placeholder="โปรดระบุรายละเอียดการเดินทาง"></textarea>
+                `;
+            }
+            container.innerHTML = html;
+        }
+
+        function toggleFoodOther() {
+            const food = document.querySelector('input[name="foodType"]:checked')?.value;
+            const otherInput = document.getElementById('foodOtherText');
+            if (food === 'อื่นๆ') {
+                otherInput.classList.remove('hidden');
+                otherInput.setAttribute('required', 'true');
+            } else {
+                otherInput.classList.add('hidden');
+                otherInput.removeAttribute('required');
+                otherInput.value = '';
+            }
+        }
+
+        function toggleShuttleFields() {
+            const shuttle = document.querySelector('input[name="shuttleService"]:checked')?.value;
+            const container = document.getElementById('shuttle-details');
+            const inputs = container.querySelectorAll('input:not([type="radio"])');
+            const radios = container.querySelectorAll('input[type="radio"]');
+            
+            if (shuttle === 'ต้องการ') {
+                container.classList.remove('hidden');
+                inputs.forEach(i => { if(i.id !== 'shuttleOtherLoc') i.setAttribute('required', 'true') });
+                // Make at least one radio required conceptually, html5 radio group handles it if one has required
+                if(radios.length>0) radios[0].setAttribute('required', 'true');
+            } else {
+                container.classList.add('hidden');
+                inputs.forEach(i => { i.removeAttribute('required'); i.value = ''; });
+                radios.forEach(r => { r.removeAttribute('required'); r.checked = false; });
+                document.getElementById('shuttleOtherLoc').classList.add('hidden');
+            }
+        }
+
+        function toggleShuttleOther() {
+            const loc = document.querySelector('input[name="shuttleLocation"]:checked')?.value;
+            const otherInput = document.getElementById('shuttleOtherLoc');
+            if (loc === 'อื่นๆ') {
+                otherInput.classList.remove('hidden');
+                otherInput.setAttribute('required', 'true');
+            } else {
+                otherInput.classList.add('hidden');
+                otherInput.removeAttribute('required');
+                otherInput.value = '';
+            }
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const loader = document.getElementById('submitLoader');
+            
+            // Gather basic data
+            const data = {
+                hospital: document.getElementById('hospital').value,
+                prefix: document.getElementById('prefix').value,
+                fullname: document.getElementById('fullname').value,
+                position: document.getElementById('position').value,
+                phone: document.getElementById('phone').value,
+                email: document.getElementById('email').value,
+                roomType: document.querySelector('input[name="roomType"]:checked').value,
+                checkInDate: document.getElementById('checkInDate').value,
+                checkOutDate: document.getElementById('checkOutDate').value,
+                travelMode: document.querySelector('input[name="travelMode"]:checked').value,
+                foodType: document.querySelector('input[name="foodType"]:checked').value,
+                foodAllergy: document.getElementById('foodAllergy').value,
+                shuttleService: document.querySelector('input[name="shuttleService"]:checked').value,
+                note: document.getElementById('note').value,
+                travelDetails: {},
+                shuttleDetails: {}
+            };
+
+            // Gather dynamic travel data
+            if (data.travelMode === 'รถยนต์ส่วนตัว' || data.travelMode === 'รถยนต์ราชการ') {
+                data.travelDetails = {
+                    goDate: document.getElementById('carGoDate').value,
+                    goTime: document.getElementById('carGoTime').value,
+                    retDate: document.getElementById('carReturnDate').value,
+                    retTime: document.getElementById('carReturnTime').value
+                };
+            } else if (data.travelMode === 'เครื่องบิน') {
+                data.travelDetails = {
+                    goDate: document.getElementById('airGoDate').value,
+                    goFlight: document.getElementById('airGoFlight').value,
+                    goTime: document.getElementById('airGoTime').value,
+                    retDate: document.getElementById('airRetDate').value,
+                    retFlight: document.getElementById('airRetFlight').value,
+                    retTime: document.getElementById('airRetTime').value
+                };
+            } else if (data.travelMode === 'รถโดยสารประจำทาง') {
+                data.travelDetails = {
+                    goDate: document.getElementById('busGoDate').value,
+                    goDetail: document.getElementById('busGoDetail').value,
+                    goTime: document.getElementById('busGoTime').value,
+                    retDate: document.getElementById('busRetDate').value,
+                    retDetail: document.getElementById('busRetDetail').value,
+                    retTime: document.getElementById('busRetTime').value
+                };
+            } else if (data.travelMode === 'รถไฟ') {
+                data.travelDetails = {
+                    goDate: document.getElementById('trainGoDate').value,
+                    goDetail: document.getElementById('trainGoDetail').value,
+                    goTime: document.getElementById('trainGoTime').value,
+                    retDate: document.getElementById('trainRetDate').value,
+                    retDetail: document.getElementById('trainRetDetail').value,
+                    retTime: document.getElementById('trainRetTime').value
+                };
+            } else if (data.travelMode === 'อื่นๆ') {
+                data.travelDetails = { text: document.getElementById('otherTravelDetail').value };
+            }
+
+            // Food other
+            if (data.foodType === 'อื่นๆ') data.foodOther = document.getElementById('foodOtherText').value;
+
+            // Shuttle data
+            if (data.shuttleService === 'ต้องการ') {
+                data.shuttleDetails = {
+                    pickDate: document.getElementById('shuttlePickDate').value,
+                    pickTime: document.getElementById('shuttlePickTime').value,
+                    dropDate: document.getElementById('shuttleDropDate').value,
+                    dropTime: document.getElementById('shuttleDropTime').value,
+                    location: document.querySelector('input[name="shuttleLocation"]:checked').value
+                };
+                if(data.shuttleDetails.location === 'อื่นๆ') {
+                    data.shuttleDetails.otherLoc = document.getElementById('shuttleOtherLoc').value;
+                }
+            }
+
+            // Save to Firebase
+            btn.disabled = true;
+            loader.classList.remove('hidden');
+
+            const success = await window.saveRegistration(data);
+            
+            btn.disabled = false;
+            loader.classList.add('hidden');
+
+            if (success) {
+                showToast('ลงทะเบียนสำเร็จ ขอบคุณครับ');
+                document.getElementById('registration-form').reset();
+                toggleTravelFields(); // reset dynamic areas
+                toggleShuttleFields();
+                toggleFoodOther();
+            } else {
+                showToast('เกิดข้อผิดพลาด โปรดลองอีกครั้ง', 'error');
+            }
+        }
+
+        function toggleAdminLogin() {
+            document.getElementById('admin-modal').classList.remove('hidden');
+        }
+
+        function closeAdminModal() {
+            document.getElementById('admin-modal').classList.add('hidden');
+            document.getElementById('admin-pwd').value = '';
+        }
+
+        function verifyAdmin() {
+            const pwd = document.getElementById('admin-pwd').value;
+            if (pwd === 'adminmec123') {
+                closeAdminModal();
+                document.getElementById('form-view').classList.add('hidden');
+                document.getElementById('admin-view').classList.remove('hidden');
+                showToast('เข้าสู่ระบบ Admin สำเร็จ');
+                if(window.fetchRegistrations && !adminUnsubscribe) {
+                    window.loadAdminData();
+                }
+            } else {
+                showToast('รหัสผ่านไม่ถูกต้อง', 'error');
+            }
+        }
+
+        function logoutAdmin() {
+            document.getElementById('admin-view').classList.add('hidden');
+            document.getElementById('form-view').classList.remove('hidden');
+            if (adminUnsubscribe) {
+                adminUnsubscribe(); // Stop listening when logged out
+                adminUnsubscribe = null;
+            }
+        }
+
+        window.loadAdminData = () => {
+            if (document.getElementById('admin-view').classList.contains('hidden')) return; // Only load if admin view is open
+            
+            adminUnsubscribe = window.fetchRegistrations((data) => {
+                registrationsData = data;
+                updateAdminDashboard(data);
+            });
+        };
+
+        async function handleStatusChange(id, newStatus) {
+            const selectEl = document.getElementById(`status-select-${id}`);
+            const originalColor = selectEl.className;
+            selectEl.classList.add('opacity-50');
+            selectEl.disabled = true;
+            
+            const success = await window.updateRegistrationStatus(id, newStatus);
+            
+            if(success) {
+                showToast('บันทึกสถานะเรียบร้อยแล้ว');
+            } else {
+                showToast('เกิดข้อผิดพลาดในการบันทึกสถานะ', 'error');
+                // The onSnapshot will revert it back to the real state anyway
+            }
+            selectEl.disabled = false;
+            selectEl.classList.remove('opacity-50');
+        }
+
+        function updateAdminDashboard(data) {
+            // Stats
+            document.getElementById('stat-total').textContent = data.length;
+            document.getElementById('stat-approved').textContent = data.filter(d => d.status === 'ยืนยันเข้าร่วม').length;
+            document.getElementById('stat-shuttle').textContent = data.filter(d => d.shuttleService === 'ต้องการ').length;
+            document.getElementById('stat-room').textContent = data.filter(d => d.roomType === 'เดี่ยว').length;
+
+            // Table
+            const tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = '';
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">ยังไม่มีข้อมูลลงทะเบียน</td></tr>';
+            } else {
+                data.forEach((row, index) => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-700/50 transition";
+                    
+                    const statusVal = row.status || 'รอดำเนินการ';
+                    let statusColorClass = 'text-yellow-400 border-yellow-500/50';
+                    if(statusVal === 'ยืนยันเข้าร่วม') statusColorClass = 'text-green-400 border-green-500/50';
+                    if(statusVal === 'ยกเลิก') statusColorClass = 'text-red-400 border-red-500/50';
+
+                    const statusOpts = ['รอดำเนินการ', 'ยืนยันเข้าร่วม', 'ยกเลิก'];
+                    const statusSelect = `
+                        <select id="status-select-${row.id}" onchange="handleStatusChange('${row.id}', this.value)" 
+                            class="bg-gray-800 text-xs rounded p-1 border focus:outline-none ${statusColorClass}">
+                            ${statusOpts.map(s => `<option value="${s}" ${statusVal === s ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                    `;
+
+                    tr.innerHTML = `
+                        <td class="px-4 py-3">${index + 1}</td>
+                        <td class="px-4 py-3">${row.prefix}${row.fullname}</td>
+                        <td class="px-4 py-3">
+                            <div class="truncate w-32 md:w-48" title="${row.hospital}">${row.hospital}</div>
+                        </td>
+                        <td class="px-4 py-3">${row.phone}</td>
+                        <td class="px-4 py-3 text-center">${statusSelect}</td>
+                        <td class="px-4 py-3 text-center">
+                            <button onclick="openPreview('${row.id}')" class="bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded text-xs transition shadow">ดูข้อมูล</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // Charts
+            renderCharts(data);
+        }
+
+        function renderCharts(data) {
+            const travelCounts = {};
+            const hospCounts = {};
+            const foodCounts = {};
+            
+            data.forEach(d => {
+                travelCounts[d.travelMode] = (travelCounts[d.travelMode] || 0) + 1;
+                hospCounts[d.hospital] = (hospCounts[d.hospital] || 0) + 1;
+                const fType = d.foodType === 'อื่นๆ' ? 'อื่นๆ' : d.foodType;
+                foodCounts[fType] = (foodCounts[fType] || 0) + 1;
+            });
+
+            // Travel Chart
+            const ctxTravel = document.getElementById('travelChart').getContext('2d');
+            if (chartsInstance.travel) chartsInstance.travel.destroy();
+            chartsInstance.travel = new Chart(ctxTravel, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(travelCounts),
+                    datasets: [{
+                        data: Object.values(travelCounts),
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels:{color:'#cbd5e1', padding: 15, boxWidth: 12} } } }
+            });
+
+            // Food Chart
+            const ctxFood = document.getElementById('foodChart').getContext('2d');
+            if (chartsInstance.food) chartsInstance.food.destroy();
+            chartsInstance.food = new Chart(ctxFood, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(foodCounts),
+                    datasets: [{
+                        data: Object.values(foodCounts),
+                        backgroundColor: ['#f43f5e', '#8b5cf6', '#10b981', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels:{color:'#cbd5e1', padding: 15, boxWidth: 12} } } }
+            });
+
+            // Hospital Chart (Top 5)
+            const sortedHosp = Object.entries(hospCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+            const ctxHosp = document.getElementById('hospitalChart').getContext('2d');
+            if (chartsInstance.hosp) chartsInstance.hosp.destroy();
+            chartsInstance.hosp = new Chart(ctxHosp, {
+                type: 'bar',
+                data: {
+                    labels: sortedHosp.map(h => h[0].substring(0, 15) + '...'), // Shorten labels
+                    datasets: [{
+                        label: 'จำนวนคน',
+                        data: sortedHosp.map(h => h[1]),
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 4
+                    }]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        y: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid:{color:'#334155'} },
+                        x: { ticks: { color: '#94a3b8' }, grid:{display:false} }
+                    }
+                }
+            });
+        }
+
+        function openPreview(id) {
+            const data = registrationsData.find(d => d.id === id);
+            if (!data) return;
+
+            let tDetails = '';
+            if(data.travelDetails) {
+                if(data.travelMode === 'เครื่องบิน' && data.travelDetails.goDate) {
+                    tDetails = `ขามา: ${toThaiDate(data.travelDetails.goDate)} เที่ยวบิน ${data.travelDetails.goFlight} ถึง ${data.travelDetails.goTime}<br>
+                                ขากลับ: ${toThaiDate(data.travelDetails.retDate)} เที่ยวบิน ${data.travelDetails.retFlight} ออก ${data.travelDetails.retTime}`;
+                } else if ((data.travelMode === 'รถโดยสารประจำทาง' || data.travelMode === 'รถไฟ') && data.travelDetails.goDate) {
+                     tDetails = `ขามา: ${toThaiDate(data.travelDetails.goDate)} เที่ยว ${data.travelDetails.goDetail} ถึง ${data.travelDetails.goTime}<br>
+                                ขากลับ: ${toThaiDate(data.travelDetails.retDate)} เที่ยว ${data.travelDetails.retDetail} ออก ${data.travelDetails.retTime}`;
+                } else if ((data.travelMode === 'รถยนต์ส่วนตัว' || data.travelMode === 'รถยนต์ราชการ') && data.travelDetails.goDate) {
+                     tDetails = `ขามา: ${toThaiDate(data.travelDetails.goDate)} เวลา ${data.travelDetails.goTime}<br>
+                                ขากลับ: ${toThaiDate(data.travelDetails.retDate)} เวลา ${data.travelDetails.retTime}`;
+                } else {
+                    tDetails = data.travelDetails.text || '-';
+                }
+            }
+
+            let sDetails = '-';
+            if(data.shuttleService === 'ต้องการ' && data.shuttleDetails) {
+                let loc = data.shuttleDetails.location === 'อื่นๆ' ? data.shuttleDetails.otherLoc : data.shuttleDetails.location;
+                sDetails = `สถานที่: ${loc}<br>
+                            รับ: ${toThaiDate(data.shuttleDetails.pickDate)} เวลา ${data.shuttleDetails.pickTime}<br>
+                            ส่ง: ${toThaiDate(data.shuttleDetails.dropDate)} เวลา ${data.shuttleDetails.dropTime}`;
+            }
+
+            const html = `
+                <div class="text-center mb-8 border-b-2 border-black pb-4">
+                    <img src="https://placehold.co/80x80/000/FFF?text=Logo" alt="Logo" class="mx-auto mb-4" onerror="this.style.display='none'">
+                    <h2 class="text-xl font-bold">แบบฟอร์มการลงทะเบียน</h2>
+                    <h3 class="text-lg">โครงการพัฒนาบุคลากรสายสนับสนุน MES รุ่นที่ 9 ประจำปีงบประมาณ 2569</h3>
+                </div>
+                
+                <table class="w-full mb-6 text-sm">
+                    <tr><td class="w-1/3 py-2 font-bold">ชื่อ - สกุล:</td><td class="border-b border-gray-300 py-2">${data.prefix}${data.fullname}</td></tr>
+                    <tr><td class="py-2 font-bold">ตำแหน่ง:</td><td class="border-b border-gray-300 py-2">${data.position}</td></tr>
+                    <tr><td class="py-2 font-bold">หน่วยงาน:</td><td class="border-b border-gray-300 py-2">${data.hospital}</td></tr>
+                    <tr><td class="py-2 font-bold">เบอร์โทรศัพท์:</td><td class="border-b border-gray-300 py-2">${data.phone}</td></tr>
+                    <tr><td class="py-2 font-bold">อีเมล:</td><td class="border-b border-gray-300 py-2">${data.email}</td></tr>
+                </table>
+
+                <h4 class="font-bold mt-6 mb-2 bg-gray-200 p-1">ข้อมูลที่พักและการเดินทาง</h4>
+                <table class="w-full mb-6 text-sm">
+                    <tr><td class="w-1/3 py-2 font-bold">ประเภทห้องพัก:</td><td class="py-2">${data.roomType}</td></tr>
+                    <tr><td class="py-2 font-bold">วันที่เข้าพัก:</td><td class="py-2">${toThaiDate(data.checkInDate)} ถึง ${toThaiDate(data.checkOutDate)}</td></tr>
+                    <tr><td class="py-2 font-bold align-top">รูปแบบการเดินทาง:</td><td class="py-2">${data.travelMode}<br><span class="text-gray-600 text-xs">${tDetails}</span></td></tr>
+                </table>
+
+                <h4 class="font-bold mt-6 mb-2 bg-gray-200 p-1">ข้อมูลอื่นๆ</h4>
+                <table class="w-full mb-6 text-sm">
+                    <tr><td class="w-1/3 py-2 font-bold">ประเภทอาหาร:</td><td class="py-2">${data.foodType} ${data.foodOther ? '('+data.foodOther+')' : ''}</td></tr>
+                    <tr><td class="py-2 font-bold">แพ้อาหาร:</td><td class="py-2">${data.foodAllergy || '-'}</td></tr>
+                    <tr><td class="py-2 font-bold align-top">บริการรถรับ-ส่ง:</td><td class="py-2">${data.shuttleService}<br><span class="text-gray-600 text-xs">${sDetails}</span></td></tr>
+                    <tr><td class="py-2 font-bold align-top">หมายเหตุ:</td><td class="py-2 border p-2 bg-gray-50 h-16">${data.note || '-'}</td></tr>
+                </table>
+
+                <div class="mt-12 text-right">
+                    <p>วันที่บันทึกข้อมูล: ${data.timestamp ? toThaiDate(new Date(data.timestamp)) : '-'}</p>
+                </div>
+            `;
+            
+            document.getElementById('preview-modal-content').innerHTML = html;
+            document.getElementById('preview-modal').classList.remove('hidden');
+        }
+
+        function closePreview() {
+            document.getElementById('preview-modal').classList.add('hidden');
+        }
+
+        function printPreview() {
+            window.print();
+        }
+
+        function exportPDF() {
+            const element = document.getElementById('preview-modal-content');
+            const opt = {
+                margin:       10,
+                filename:     'Registration_MES9.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            showToast('กำลังสร้าง PDF กรุณารอสักครู่...');
+            html2pdf().set(opt).from(element).save().then(()=>{
+                showToast('ดาวน์โหลด PDF สำเร็จ');
+            });
+        }
+
+        function exportExcel() {
+            if(registrationsData.length === 0) {
+                showToast('ไม่มีข้อมูลสำหรับ Export', 'error');
+                return;
+            }
+
+            const exportData = registrationsData.map((d, i) => ({
+                'ลำดับ': i + 1,
+                'สถานะ': d.status || 'รอดำเนินการ',
+                'หน่วยงาน': d.hospital,
+                'คำนำหน้า': d.prefix,
+                'ชื่อ-สกุล': d.fullname,
+                'ตำแหน่ง': d.position,
+                'เบอร์โทรศัพท์': d.phone,
+                'อีเมล': d.email,
+                'ห้องพัก': d.roomType,
+                'เข้าพักวันที่': toThaiDate(d.checkInDate),
+                'ออกวันที่': toThaiDate(d.checkOutDate),
+                'การเดินทาง': d.travelMode,
+                'ประเภทอาหาร': d.foodType === 'อื่นๆ' ? d.foodOther : d.foodType,
+                'แพ้อาหาร': d.foodAllergy || '-',
+                'รถรับส่ง': d.shuttleService,
+                'หมายเหตุ': d.note || '-'
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Registrations");
+            XLSX.writeFile(wb, "MES9_Registrations.xlsx");
+            showToast('ดาวน์โหลด Excel สำเร็จ');
+        }
+    </script>
+</body>
+</html>
