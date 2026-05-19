@@ -62,7 +62,7 @@
 
     <script>
         // 🚨 นำ URL ของเว็บแอป (Google Apps Script) ที่ก๊อปปี้มา วางแทนที่ในเครื่องหมายคำพูดด้านล่าง
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEo0gywcB4ymRLsOzVWFU4Bau5y17QXLcIaVCg68jB7p66ybRIDDFMtyp60DigcPo/exec'; 
+        const SCRIPT_URL = 'YOUR_GOOGLE_WEB_APP_URL_HERE'; 
 
         // สร้าง ID สุ่มให้แต่ละรายการ
         const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -77,6 +77,10 @@
                 data.id = generateId(); 
                 const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
+                    redirect: 'follow',
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8",
+                    },
                     body: JSON.stringify(data)
                 });
                 const result = await response.json();
@@ -92,6 +96,10 @@
             try {
                 const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
+                    redirect: 'follow',
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8",
+                    },
                     body: JSON.stringify({ action: 'updateStatus', id: id, status: newStatus })
                 });
                 const result = await response.json();
